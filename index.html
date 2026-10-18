@@ -11,15 +11,15 @@
   <style>
     :root {
       color-scheme: light;
-      --paper: #eee9db;
-      --paper-light: #f8f5ec;
-      --ink: #222c25;
-      --muted: #6c7167;
-      --line: #d0c9b8;
-      --green: #385f4c;
-      --green-dark: #294536;
-      --rust: #a34e39;
-      --gold: #ad8544;
+      --paper: #f2ece9;
+      --paper-light: #fffaf6;
+      --ink: #38333b;
+      --muted: #77717a;
+      --line: #d9cfce;
+      --green: #829a8d;
+      --green-dark: #5d7569;
+      --rust: #b66e78;
+      --gold: #c49d73;
       --serif: "IM Fell English", Georgia, serif;
       --sans: "DM Sans", "Trebuchet MS", sans-serif;
     }
@@ -36,6 +36,23 @@
         radial-gradient(ellipse at 88% 78%, rgba(185,165,126,.14), transparent 32%),
         repeating-linear-gradient(0deg, rgba(83,73,53,.025) 0, rgba(83,73,53,.025) 1px, transparent 1px, transparent 4px);
       font-family: var(--sans);
+      transition: background-color .25s ease, color .25s ease;
+    }
+
+    body.form-smash {
+      color-scheme: dark;
+      --paper: #252829;
+      --paper-light: #303435;
+      --ink: #f0efec;
+      --muted: #b2b5b3;
+      --line: #555b5c;
+      --green: #aeb7b2;
+      --green-dark: #414748;
+      --rust: #d28a7c;
+      --gold: #c9c3b4;
+      background-color: var(--paper);
+      background-image: radial-gradient(ellipse at 14% 8%, rgba(255,255,255,.045), transparent 34%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0, rgba(255,255,255,.018) 1px, transparent 1px, transparent 4px);
     }
 
     button, input { font: inherit; }
@@ -133,6 +150,23 @@
     .score-copy .micro-label { color: #c8d2c8; }
     .score-number { margin: 5px 0 5px; font: 76px/.95 var(--serif); }
     .score-caption { margin: 0; color: #d0d8ce; font-size: 13px; }
+
+    .hp-section { margin: 0 0 30px; }
+    .hp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .hp-card { min-width: 0; padding: 14px; border: 1px solid var(--line); background: rgba(248,245,236,.48); transition: border-color .2s ease, background-color .2s ease; }
+    body.form-smash .hp-card { background: rgba(255,255,255,.035); }
+    .hp-card.active { border-color: var(--green-dark); box-shadow: inset 3px 0 var(--green-dark); background: rgba(255,255,255,.5); }
+    body.form-smash .hp-card.active { background: rgba(255,255,255,.075); }
+    .hp-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+    .hp-card-title { margin: 0; font: 18px var(--serif); }
+    .active-tag { color: var(--green-dark); font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
+    body.form-smash .active-tag { color: #e0e2df; }
+    .hp-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .hp-field { display: grid; gap: 5px; min-width: 0; }
+    .hp-field label { color: var(--muted); font-size: 9px; font-weight: 700; }
+    .hp-input { width: 100%; min-width: 0; height: 36px; padding: 0 7px; border: 1px solid var(--line); border-radius: 0; outline: 0; color: var(--ink); background: var(--paper-light); font-size: 13px; font-variant-numeric: tabular-nums; }
+    .hp-input:focus { border-color: var(--green-dark); box-shadow: 0 0 0 2px rgba(56,95,76,.12); }
+    .form-state { margin: 0 0 15px; font: italic 15px var(--serif); color: var(--muted); }
 
     .threshold-box {
       position: relative;
@@ -287,6 +321,13 @@
     .roll-line strong { color: var(--green-dark); font-size: 24px; font-weight: 400; }
     .roll-line.failed strong { color: var(--rust); }
     .roll-detail { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+    .roll-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
+    .roll-choice, .battle-stop, .retry-roll { min-height: 42px; padding: 9px 12px; border: 1px solid var(--green-dark); color: #fff; background: var(--green); cursor: pointer; font-size: 11px; font-weight: 700; }
+    .roll-choice.fail { border-color: var(--rust); background: var(--rust); }
+    .roll-choice:hover, .battle-stop:hover, .retry-roll:hover { filter: brightness(.92); }
+    .battle-stop { width: 100%; margin-top: 10px; border-color: var(--rust); background: var(--rust); }
+    .retry-roll { width: 100%; margin-top: 10px; }
+    .timer-note { min-height: 16px; margin: 9px 0 0; color: var(--muted); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
 
     .history { padding-top: 22px; }
     .history-heading { margin-bottom: 12px; }
@@ -316,6 +357,10 @@
       .sidebar { padding: 0; border: 0; }
       .dc-block { padding-top: 20px; border-top: 1px solid var(--line); }
       .history-list { max-height: 200px; }
+      .hp-grid { gap: 8px; }
+      .hp-card { padding: 11px 9px; }
+      .hp-fields { gap: 5px; }
+      .hp-input { padding: 0 5px; }
     }
 
     @media (max-width: 420px) {
@@ -336,25 +381,70 @@
     <header class="masthead">
       <div>
         <p class="eyebrow">Odysee of the drakenlord</p>
-        <h1>Woedemeter</h1>
+        <h1>Dr. Reed / Smash</h1>
       </div>
-      <p class="masthead-note">Houd bij wat zich opstapelt.</p>
+      <p class="masthead-note">Twee vormen, één woedemeter.</p>
     </header>
 
     <div class="layout">
       <section aria-label="Teller en gebeurtenissen">
-        <p class="section-label">Actieve teller</p>
-        <input id="trackerName" class="tracker-name" aria-label="Naam van de teller" maxlength="36" value="Woedemeter">
+        <p class="section-label">Personages</p>
+        <p id="formState" class="form-state" aria-live="polite">Dr. Reed is actief.</p>
+
+        <section class="hp-section" aria-label="Hit points per vorm">
+          <div class="hp-grid">
+            <div class="hp-card" data-form-card="reed">
+              <div class="hp-card-heading">
+                <h2 class="hp-card-title">Dr. Reed</h2>
+                <span class="active-tag" data-active-tag hidden>Actief</span>
+              </div>
+              <div class="hp-fields">
+                <div class="hp-field">
+                  <label for="reedCurrentHp">Huidig HP</label>
+                  <input id="reedCurrentHp" class="hp-input" type="number" min="0" step="1" value="0" data-form="reed" data-hp="currentHp">
+                </div>
+                <div class="hp-field">
+                  <label for="reedMaxHp">Max HP</label>
+                  <input id="reedMaxHp" class="hp-input" type="number" min="0" step="1" value="0" data-form="reed" data-hp="maxHp">
+                </div>
+                <div class="hp-field">
+                  <label for="reedTempHp">Tijdelijk</label>
+                  <input id="reedTempHp" class="hp-input" type="number" min="0" step="1" value="0" data-form="reed" data-hp="tempHp">
+                </div>
+              </div>
+            </div>
+            <div class="hp-card" data-form-card="smash">
+              <div class="hp-card-heading">
+                <h2 class="hp-card-title">Smash</h2>
+                <span class="active-tag" data-active-tag hidden>Actief</span>
+              </div>
+              <div class="hp-fields">
+                <div class="hp-field">
+                  <label for="smashCurrentHp">Huidig HP</label>
+                  <input id="smashCurrentHp" class="hp-input" type="number" min="0" step="1" value="0" data-form="smash" data-hp="currentHp">
+                </div>
+                <div class="hp-field">
+                  <label for="smashMaxHp">Max HP</label>
+                  <input id="smashMaxHp" class="hp-input" type="number" min="0" step="1" value="0" data-form="smash" data-hp="maxHp">
+                </div>
+                <div class="hp-field">
+                  <label for="smashTempHp">Tijdelijk</label>
+                  <input id="smashTempHp" class="hp-input" type="number" min="0" step="1" value="0" data-form="smash" data-hp="tempHp">
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div class="score-panel">
           <div class="score-copy">
-            <p class="micro-label">Huidige waarde</p>
+            <p class="micro-label">Woede</p>
             <p id="score" class="score-number" aria-live="polite">0</p>
             <p id="scoreCaption" class="score-caption">Nog onder de grens</p>
           </div>
           <div class="threshold-box">
             <label for="threshold">GRENS</label>
-            <input id="threshold" type="number" min="0" max="999" step="1" value="5" inputmode="numeric">
+            <input id="threshold" type="number" min="0" max="99" step="1" value="5" inputmode="numeric">
           </div>
         </div>
 
@@ -382,21 +472,24 @@
         <section class="dc-block" aria-live="polite">
           <div class="dc-heading">
             <p class="section-label">Worp vereist</p>
-            <span id="dcTag" class="dc-tag" hidden>Actief</span>
+            <span id="dcTag" class="dc-tag" hidden>Worp nodig</span>
           </div>
           <div class="dc-display">
             <p id="dcValue" class="dc-number">—</p>
           </div>
-          <p id="dcFormula" class="formula">De grens is nog niet overschreden.</p>
-          <p id="inactiveNote" class="inactive-note">Zodra de waarde boven de grens komt, verschijnt hier de doelwaarde voor je worp.</p>
+          <p id="dcFormula" class="formula">De worp komt hier zodra de drempel is bereikt.</p>
+          <p id="inactiveNote" class="inactive-note">Bij de drempel werp je zelf en geef je hier aan of de worp slaagt.</p>
         </section>
 
         <section class="roll-area" aria-label="Dobbelsteenworp">
-          <button id="rollButton" class="roll-button" type="button" disabled>
-            <span class="die-mark" aria-hidden="true">20</span>
-            <span>Gooi d20</span>
-          </button>
           <div id="rollResult" class="roll-result" aria-live="polite"></div>
+          <div id="rollActions" class="roll-actions" hidden>
+            <button class="roll-choice" type="button" data-roll="success">Geslaagd</button>
+            <button class="roll-choice fail" type="button" data-roll="fail">Mislukt</button>
+          </div>
+          <button id="retryRoll" class="retry-roll" type="button" hidden>Opnieuw werpen</button>
+          <button id="endBattle" class="battle-stop" type="button" hidden>Einde gevecht</button>
+          <p id="timerNote" class="timer-note" aria-live="polite"></p>
         </section>
 
         <section class="history">
@@ -416,30 +509,65 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "ragetracker";
+    const STORAGE_KEY = "reed-smash-tracker";
+    const FORM_NAMES = { reed: "Dr. Reed", smash: "Smash" };
     const defaultState = {
-      trackerName: "Woedemeter",
+      activeForm: "reed",
       threshold: 5,
-      value: 0,
+      rage: 0,
+      forms: {
+        reed: { maxHp: 0, currentHp: 0, tempHp: 0 },
+        smash: { maxHp: 0, currentHp: 0, tempHp: 0 }
+      },
       actions: [
-        { id: "strain", label: "Inspanning", delta: 1 },
-        { id: "rest", label: "Rust", delta: -1 }
+        { id: "strain", label: "Woede", delta: 1 },
+        { id: "calm", label: "Kalmeren", delta: -1 }
       ],
       history: [],
-      lastRoll: null
+      decayActive: false,
+      nextDecayAt: null,
+      rollStatus: null,
+      rollKind: null,
+      lastOutcome: null
     };
+
+    function nonNegativeInteger(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
+    }
 
     function loadState() {
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        let saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (!saved) {
+          const previous = JSON.parse(localStorage.getItem("ragetracker"));
+          if (previous && typeof previous === "object") saved = { ...previous, rage: previous.value };
+        }
         if (!saved || typeof saved !== "object") return structuredClone(defaultState);
+        const forms = {};
+        for (const form of Object.keys(FORM_NAMES)) {
+          const source = saved.forms?.[form] || {};
+          const maxHp = nonNegativeInteger(source.maxHp);
+          forms[form] = {
+            maxHp,
+            currentHp: Math.min(maxHp, nonNegativeInteger(source.currentHp)),
+            tempHp: nonNegativeInteger(source.tempHp)
+          };
+        }
         return {
           ...structuredClone(defaultState),
           ...saved,
-          threshold: Number.isFinite(Number(saved.threshold)) ? Math.max(0, Number(saved.threshold)) : defaultState.threshold,
-          value: Number.isFinite(Number(saved.value)) ? Number(saved.value) : defaultState.value,
+          activeForm: FORM_NAMES[saved.activeForm] ? saved.activeForm : "reed",
+          threshold: nonNegativeInteger(saved.threshold),
+          rage: nonNegativeInteger(saved.rage),
+          forms,
           actions: Array.isArray(saved.actions) ? saved.actions.filter(action => action && typeof action.label === "string" && Number.isInteger(action.delta)) : structuredClone(defaultState.actions),
-          history: Array.isArray(saved.history) ? saved.history.slice(0, 40) : []
+          history: Array.isArray(saved.history) ? saved.history.slice(0, 40) : [],
+          decayActive: saved.decayActive === true,
+          nextDecayAt: Number.isFinite(Number(saved.nextDecayAt)) && saved.nextDecayAt !== null ? Number(saved.nextDecayAt) : null,
+          rollStatus: ["pending", "failed"].includes(saved.rollStatus) ? saved.rollStatus : null,
+          rollKind: ["initial", "decay"].includes(saved.rollKind) ? saved.rollKind : null,
+          lastOutcome: typeof saved.lastOutcome === "boolean" ? saved.lastOutcome : null
         };
       } catch {
         return structuredClone(defaultState);
@@ -447,8 +575,9 @@
     }
 
     let state = loadState();
+    let timerHandle = null;
     const elements = {
-      trackerName: document.querySelector("#trackerName"),
+      formState: document.querySelector("#formState"),
       threshold: document.querySelector("#threshold"),
       score: document.querySelector("#score"),
       scoreCaption: document.querySelector("#scoreCaption"),
@@ -462,8 +591,11 @@
       dcTag: document.querySelector("#dcTag"),
       dcFormula: document.querySelector("#dcFormula"),
       inactiveNote: document.querySelector("#inactiveNote"),
-      rollButton: document.querySelector("#rollButton"),
       rollResult: document.querySelector("#rollResult"),
+      rollActions: document.querySelector("#rollActions"),
+      retryRoll: document.querySelector("#retryRoll"),
+      endBattle: document.querySelector("#endBattle"),
+      timerNote: document.querySelector("#timerNote"),
       historyList: document.querySelector("#historyList")
     };
 
@@ -475,11 +607,26 @@
       return String(value).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
     }
 
-    function applyAction(action) {
-      state.value += action.delta;
-      state.history.unshift({ label: action.label, delta: action.delta, value: state.value, time: Date.now() });
+    function addHistory(label, delta = 0) {
+      state.history.unshift({ label, delta, value: state.rage, time: Date.now() });
       state.history = state.history.slice(0, 40);
-      state.lastRoll = null;
+    }
+
+    function checkThreshold() {
+      if (state.activeForm === "reed" && !state.decayActive && state.rage >= state.threshold && !state.rollStatus) {
+        state.rollStatus = "pending";
+        state.rollKind = "initial";
+      } else if (state.rage < state.threshold && state.rollKind === "initial") {
+        state.rollStatus = null;
+        state.rollKind = null;
+      }
+    }
+
+    function applyAction(action) {
+      state.rage = Math.max(0, state.rage + action.delta);
+      addHistory(action.label, action.delta);
+      state.lastOutcome = null;
+      checkThreshold();
       render();
     }
 
@@ -502,43 +649,147 @@
       }
       elements.historyList.innerHTML = state.history.map(entry => {
         const time = new Date(entry.time).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+        const change = entry.delta === 0 ? "vorm" : `${entry.delta > 0 ? "+" : ""}${entry.delta}`;
         return `<div class="history-row">
           <span class="history-label">${escapeHtml(entry.label)}</span>
-          <span class="history-change ${entry.delta < 0 ? "negative" : "positive"}">${entry.delta > 0 ? "+" : ""}${entry.delta}</span>
-          <span class="history-time">${time} · waarde ${entry.value}</span>
+          <span class="history-change ${entry.delta < 0 ? "negative" : entry.delta > 0 ? "positive" : ""}">${change}</span>
+          <span class="history-time">${time} · woede ${entry.value}</span>
         </div>`;
       }).join("");
     }
 
+    function renderForms() {
+      document.querySelectorAll("[data-form-card]").forEach(card => {
+        const form = card.dataset.formCard;
+        const active = form === state.activeForm;
+        card.classList.toggle("active", active);
+        card.querySelector("[data-active-tag]").hidden = !active;
+      });
+      document.querySelectorAll("[data-form][data-hp]").forEach(input => {
+        if (document.activeElement === input) return;
+        input.value = state.forms[input.dataset.form][input.dataset.hp];
+      });
+      elements.formState.textContent = `${FORM_NAMES[state.activeForm]} is actief.`;
+    }
+
     function renderRoll() {
-      if (!state.lastRoll) {
+      const dc = 10 + state.rage - state.threshold;
+      elements.rollActions.hidden = state.rollStatus !== "pending";
+      elements.retryRoll.hidden = !(state.rollStatus === "failed" && state.rollKind === "initial");
+      if (state.rollStatus === "pending") {
+        const title = state.rollKind === "decay" ? "Afbouwcontrole" : "Transformatiecontrole";
+        elements.rollResult.innerHTML = `<p class="roll-line">${title} · <strong>DC ${dc}</strong></p><p class="roll-detail">Werp zelf en kies hieronder de uitkomst.</p>`;
+      } else if (state.rollStatus === "failed") {
+        elements.rollResult.innerHTML = '<p class="roll-line failed">Worp mislukt</p><p class="roll-detail">Je kunt opnieuw werpen.</p>';
+      } else if (state.lastOutcome !== null) {
+        elements.rollResult.innerHTML = `<p class="roll-line ${state.lastOutcome ? "" : "failed"}">${state.lastOutcome ? "Worp geslaagd" : "Worp mislukt"}</p>`;
+      } else {
         elements.rollResult.innerHTML = "";
-        return;
       }
-      const { result, dc, success } = state.lastRoll;
-      elements.rollResult.innerHTML = `<p class="roll-line ${success ? "" : "failed"}">${success ? "Geslaagd" : "Niet gehaald"} · <strong>${result}</strong></p><p class="roll-detail">d20 tegen DC ${dc}</p>`;
+    }
+
+    function renderTimer() {
+      if (state.nextDecayAt) {
+        const seconds = Math.max(0, Math.ceil((state.nextDecayAt - Date.now()) / 1000));
+        elements.timerNote.textContent = `Volgende woededaling over ${seconds} sec`;
+      } else if (state.rollStatus === "pending" && state.rollKind === "decay") {
+        elements.timerNote.textContent = "Worp nodig; timer wacht op je keuze.";
+      } else if (state.decayActive) {
+        elements.timerNote.textContent = "Afbouw actief.";
+      } else {
+        elements.timerNote.textContent = "";
+      }
     }
 
     function render() {
-      const overThreshold = state.value > state.threshold;
-      const dc = 10 + state.value - state.threshold;
-      elements.trackerName.value = state.trackerName;
+      document.body.classList.toggle("form-smash", state.activeForm === "smash");
+      document.body.classList.toggle("form-reed", state.activeForm === "reed");
+      const thresholdReached = state.rage >= state.threshold;
+      const scale = Math.max(state.threshold, state.rage, 1);
+      const showDc = state.rollStatus === "pending" || (state.activeForm === "reed" && thresholdReached && !state.decayActive);
+      const dc = 10 + state.rage - state.threshold;
       elements.threshold.value = state.threshold;
-      elements.score.textContent = state.value;
-      elements.scoreCaption.textContent = overThreshold ? `${state.value - state.threshold} boven de grens` : state.value === state.threshold ? "Precies op de grens" : "Nog onder de grens";
-      elements.meterFill.style.width = `${Math.min(100, Math.max(0, (state.value / Math.max(1, state.threshold)) * 100))}%`;
-      elements.meterFill.classList.toggle("over", overThreshold);
-      elements.meterTick.style.left = `${Math.min(100, 100)}%`;
-      elements.meterThreshold.textContent = `grens ${state.threshold}`;
-      elements.dcValue.textContent = overThreshold ? dc : "—";
-      elements.dcTag.hidden = !overThreshold;
-      elements.dcFormula.textContent = overThreshold ? `10 + ${state.value} − ${state.threshold}` : "De grens is nog niet overschreden.";
-      elements.inactiveNote.hidden = overThreshold;
-      elements.rollButton.disabled = !overThreshold;
+      elements.score.textContent = state.rage;
+      elements.scoreCaption.textContent = thresholdReached ? `${state.rage - state.threshold} boven de drempel` : `${state.threshold - state.rage} tot de drempel`;
+      elements.meterFill.style.width = `${Math.min(100, (state.rage / scale) * 100)}%`;
+      elements.meterFill.classList.toggle("over", thresholdReached);
+      elements.meterTick.style.left = `${Math.min(100, (state.threshold / scale) * 100)}%`;
+      elements.meterThreshold.textContent = `drempel ${state.threshold}`;
+      elements.dcValue.textContent = showDc ? dc : "—";
+      elements.dcTag.hidden = state.rollStatus !== "pending";
+      elements.dcFormula.textContent = showDc ? `10 + ${state.rage} − ${state.threshold}` : "De worp komt hier zodra die nodig is.";
+      elements.inactiveNote.hidden = state.rollStatus === "pending";
+      if (state.activeForm === "smash") {
+        elements.inactiveNote.textContent = state.decayActive ? "Na elke stap van de afbouw werp je zelf opnieuw." : "Smash is actief. Beëindig het gevecht om de woede af te bouwen.";
+      } else {
+        elements.inactiveNote.textContent = "Bij de drempel werp je zelf en geef je hier aan of de worp slaagt.";
+      }
+      elements.endBattle.hidden = state.activeForm !== "smash" || state.decayActive;
+      renderForms();
       renderActions();
       renderHistory();
       renderRoll();
+      renderTimer();
       saveState();
+    }
+
+    function setCountdown() {
+      if (!state.decayActive || state.rollStatus === "pending") return;
+      if (!state.nextDecayAt) state.nextDecayAt = Date.now() + 30000;
+      if (timerHandle) clearInterval(timerHandle);
+      timerHandle = setInterval(() => {
+        if (state.nextDecayAt > Date.now()) {
+          renderTimer();
+          return;
+        }
+        clearInterval(timerHandle);
+        timerHandle = null;
+        state.nextDecayAt = null;
+        const previousRage = state.rage;
+        state.rage = Math.max(0, state.rage - 1);
+        if (state.rage < previousRage) addHistory("Woede neemt af", -1);
+        state.lastOutcome = null;
+        if (state.activeForm === "smash") {
+          state.rollStatus = "pending";
+          state.rollKind = "decay";
+        } else if (state.rage === 0) {
+          state.decayActive = false;
+        }
+        render();
+        if (state.decayActive && state.activeForm === "reed") setCountdown();
+      }, 250);
+      renderTimer();
+      saveState();
+    }
+
+    function transformTo(form) {
+      const source = state.forms[state.activeForm];
+      const target = state.forms[form];
+      if (source.maxHp > 0) {
+        const hpRatio = Math.min(1, source.currentHp / source.maxHp);
+        target.currentHp = Math.round(target.maxHp * hpRatio);
+      }
+      state.activeForm = form;
+      addHistory(`Transformatie naar ${FORM_NAMES[form]}`);
+    }
+
+    function resolveRoll(success) {
+      if (state.rollStatus !== "pending") return;
+      const kind = state.rollKind;
+      state.lastOutcome = success;
+      state.rollStatus = null;
+      state.rollKind = null;
+      if (!success && kind === "initial") {
+        state.rollStatus = "failed";
+        state.rollKind = "initial";
+      } else if (success && kind === "initial" && state.activeForm === "reed") {
+        transformTo("smash");
+      } else if (success && kind === "decay" && state.activeForm === "smash") {
+        transformTo("reed");
+      }
+      if (kind === "decay" && state.rage === 0 && state.activeForm === "reed") state.decayActive = false;
+      render();
+      if (kind === "decay" && state.decayActive) setCountdown();
     }
 
     elements.eventsList.addEventListener("click", event => {
@@ -570,23 +821,42 @@
     });
 
     elements.eventDelta.addEventListener("input", () => elements.eventDelta.setCustomValidity(""));
-    elements.trackerName.addEventListener("input", () => {
-      state.trackerName = elements.trackerName.value.trim() || "Teller";
-      saveState();
+    document.querySelectorAll("[data-form][data-hp]").forEach(input => {
+      input.addEventListener("change", () => {
+        const form = state.forms[input.dataset.form];
+        const field = input.dataset.hp;
+        form[field] = nonNegativeInteger(input.value);
+        if (field === "maxHp") form.currentHp = Math.min(form.currentHp, form.maxHp);
+        if (field === "currentHp") form.currentHp = Math.min(form.currentHp, form.maxHp);
+        render();
+      });
     });
+
     elements.threshold.addEventListener("change", () => {
       const parsed = Number(elements.threshold.value);
       if (Number.isInteger(parsed) && parsed >= 0) {
         state.threshold = parsed;
-        state.lastRoll = null;
+        state.lastOutcome = null;
+        checkThreshold();
         render();
       }
     });
 
-    elements.rollButton.addEventListener("click", () => {
-      const dc = 10 + state.value - state.threshold;
-      const result = Math.floor(Math.random() * 20) + 1;
-      state.lastRoll = { result, dc, success: result >= dc };
+    elements.rollActions.addEventListener("click", event => {
+      const choice = event.target.closest("[data-roll]");
+      if (choice) resolveRoll(choice.dataset.roll === "success");
+    });
+
+    elements.retryRoll.addEventListener("click", () => {
+      state.rollStatus = "pending";
+      state.lastOutcome = null;
+      render();
+    });
+
+    elements.endBattle.addEventListener("click", () => {
+      state.decayActive = true;
+      state.lastOutcome = null;
+      setCountdown();
       render();
     });
 
@@ -596,12 +866,16 @@
     });
 
     document.querySelector("#resetAll").addEventListener("click", () => {
-      if (!window.confirm("Alle tellerwaarden, gebeurtenissen en instellingen resetten?")) return;
+      if (!window.confirm("Alle HP, woede, gebeurtenissen en instellingen resetten?")) return;
+      if (timerHandle) clearInterval(timerHandle);
+      timerHandle = null;
       state = structuredClone(defaultState);
       render();
     });
 
+    checkThreshold();
     render();
+    if (state.decayActive && state.rollStatus !== "pending") setCountdown();
   </script>
 </body>
 </html>
