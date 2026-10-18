@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#eee9db">
-  <title>De Weging — personage-tracker</title>
+  <title>Dr. Reed / Smash</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
@@ -335,8 +335,8 @@
   <main class="shell">
     <header class="masthead">
       <div>
-        <p class="eyebrow">Een avonturiersregister</p>
-        <h1>De Weging</h1>
+        <p class="eyebrow">Odysee of the drakenlord</p>
+        <h1>Woedemeter</h1>
       </div>
       <p class="masthead-note">Houd bij wat zich opstapelt.</p>
     </header>
@@ -344,7 +344,7 @@
     <div class="layout">
       <section aria-label="Teller en gebeurtenissen">
         <p class="section-label">Actieve teller</p>
-        <input id="trackerName" class="tracker-name" aria-label="Naam van de teller" maxlength="36" value="Last van de reis">
+        <input id="trackerName" class="tracker-name" aria-label="Naam van de teller" maxlength="36" value="Woedemeter">
 
         <div class="score-panel">
           <div class="score-copy">
@@ -416,9 +416,9 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "de-weging-v1";
+    const STORAGE_KEY = "ragetracker";
     const defaultState = {
-      trackerName: "Last van de reis",
+      trackerName: "Woedemeter",
       threshold: 5,
       value: 0,
       actions: [
