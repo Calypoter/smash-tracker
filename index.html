@@ -57,6 +57,7 @@
 
     button, input { font: inherit; }
     button { color: inherit; }
+    [hidden] { display: none !important; }
 
     .shell {
       width: min(1080px, calc(100% - 48px));
@@ -193,6 +194,7 @@
     }
 
     .threshold-box input:focus { box-shadow: 0 1px 0 var(--gold); }
+    .threshold-value { margin: 0; color: #d6d6c8; font-size: 9px; font-weight: 700; letter-spacing: .6px; text-align: center; }
 
     .meter-wrap { margin: 16px 0 31px; }
     .meter-track { position: relative; height: 5px; background: #d5d0c2; }
@@ -328,6 +330,13 @@
     .battle-stop { width: 100%; margin-top: 10px; border-color: var(--rust); background: var(--rust); }
     .retry-roll { width: 100%; margin-top: 10px; }
     .timer-note { min-height: 16px; margin: 9px 0 0; color: var(--muted); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
+    .decay-dialog { width: min(360px, calc(100% - 32px)); padding: 25px; border: 1px solid var(--line); color: var(--ink); background: var(--paper-light); box-shadow: 0 18px 60px rgba(0,0,0,.28); }
+    .decay-dialog::backdrop { background: rgba(15,18,17,.58); }
+    .dialog-title { margin: 0 0 8px; font: 24px var(--serif); }
+    .dialog-prompt { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
+    .dialog-choice { min-height: 44px; padding: 9px; border: 1px solid var(--green-dark); color: #fff; background: var(--green); cursor: pointer; font-size: 11px; font-weight: 700; }
+    .dialog-choice.fail { border-color: var(--rust); background: var(--rust); }
 
     .history { padding-top: 22px; }
     .history-heading { margin-bottom: 12px; }
@@ -443,8 +452,9 @@
             <p id="scoreCaption" class="score-caption">Nog onder de grens</p>
           </div>
           <div class="threshold-box">
-            <label for="threshold">GRENS</label>
-            <input id="threshold" type="number" min="0" max="99" step="1" value="5" inputmode="numeric">
+            <label for="level">LEVEL</label>
+            <input id="level" type="number" min="1" max="20" step="1" value="1" inputmode="numeric">
+            <p id="thresholdValue" class="threshold-value">DREMPEL 5</p>
           </div>
         </div>
 
@@ -487,7 +497,6 @@
             <button class="roll-choice" type="button" data-roll="success">Geslaagd</button>
             <button class="roll-choice fail" type="button" data-roll="fail">Mislukt</button>
           </div>
-          <button id="retryRoll" class="retry-roll" type="button" hidden>Opnieuw werpen</button>
           <button id="endBattle" class="battle-stop" type="button" hidden>Einde gevecht</button>
           <p id="timerNote" class="timer-note" aria-live="polite"></p>
         </section>
@@ -508,13 +517,24 @@
     </footer>
   </main>
 
+  <dialog id="decayDialog" class="decay-dialog" aria-labelledby="decayDialogTitle" aria-describedby="decayDialogPrompt">
+    <h2 id="decayDialogTitle" class="dialog-title">Tijd om opnieuw te werpen</h2>
+    <p id="decayDialogPrompt" class="dialog-prompt"></p>
+    <div class="dialog-actions">
+      <button class="dialog-choice" type="button" data-decay-roll="success">Geslaagd</button>
+      <button class="dialog-choice fail" type="button" data-decay-roll="fail">Mislukt</button>
+    </div>
+  </dialog>
+
   <script>
     const STORAGE_KEY = "reed-smash-tracker";
     const FORM_NAMES = { reed: "Dr. Reed", smash: "Smash" };
     const defaultState = {
       activeForm: "reed",
+      level: 1,
       threshold: 5,
       rage: 0,
+      hpRatio: 0,
       forms: {
         reed: { maxHp: 0, currentHp: 0, tempHp: 0 },
         smash: { maxHp: 0, currentHp: 0, tempHp: 0 }
@@ -530,6 +550,13 @@
       rollKind: null,
       lastOutcome: null
     };
+
+    function thresholdForLevel(level) {
+      if (level <= 3) return 5;
+      if (level <= 8) return 6;
+      if (level <= 14) return 8;
+      return 10;
+    }
 
     function nonNegativeInteger(value) {
       const number = Number(value);
@@ -554,19 +581,33 @@
             tempHp: nonNegativeInteger(source.tempHp)
           };
         }
+        const activeForm = FORM_NAMES[saved.activeForm] ? saved.activeForm : "reed";
+        const otherForm = activeForm === "reed" ? "smash" : "reed";
+        const activeHp = forms[activeForm];
+        const otherHp = forms[otherForm];
+        const savedRatio = Number(saved.hpRatio);
+        const hpRatio = saved.hpRatio !== undefined && Number.isFinite(savedRatio)
+          ? Math.min(1, Math.max(0, savedRatio))
+          : activeHp.maxHp > 0
+            ? activeHp.currentHp / activeHp.maxHp
+            : otherHp.maxHp > 0 ? otherHp.currentHp / otherHp.maxHp : 0;
+        for (const form of Object.keys(FORM_NAMES)) forms[form].currentHp = Math.round(forms[form].maxHp * hpRatio);
+        const level = Math.min(20, Math.max(1, nonNegativeInteger(saved.level || 1)));
         return {
           ...structuredClone(defaultState),
           ...saved,
-          activeForm: FORM_NAMES[saved.activeForm] ? saved.activeForm : "reed",
-          threshold: nonNegativeInteger(saved.threshold),
+          activeForm,
+          level,
+          threshold: thresholdForLevel(level),
           rage: nonNegativeInteger(saved.rage),
+          hpRatio,
           forms,
           actions: Array.isArray(saved.actions) ? saved.actions.filter(action => action && typeof action.label === "string" && Number.isInteger(action.delta)) : structuredClone(defaultState.actions),
           history: Array.isArray(saved.history) ? saved.history.slice(0, 40) : [],
           decayActive: saved.decayActive === true,
           nextDecayAt: Number.isFinite(Number(saved.nextDecayAt)) && saved.nextDecayAt !== null ? Number(saved.nextDecayAt) : null,
-          rollStatus: ["pending", "failed"].includes(saved.rollStatus) ? saved.rollStatus : null,
-          rollKind: ["initial", "decay"].includes(saved.rollKind) ? saved.rollKind : null,
+          rollStatus: saved.rollStatus === "pending" ? "pending" : null,
+          rollKind: saved.rollStatus === "pending" && ["initial", "decay"].includes(saved.rollKind) ? saved.rollKind : null,
           lastOutcome: typeof saved.lastOutcome === "boolean" ? saved.lastOutcome : null
         };
       } catch {
@@ -578,7 +619,8 @@
     let timerHandle = null;
     const elements = {
       formState: document.querySelector("#formState"),
-      threshold: document.querySelector("#threshold"),
+      level: document.querySelector("#level"),
+      thresholdValue: document.querySelector("#thresholdValue"),
       score: document.querySelector("#score"),
       scoreCaption: document.querySelector("#scoreCaption"),
       meterFill: document.querySelector("#meterFill"),
@@ -593,9 +635,10 @@
       inactiveNote: document.querySelector("#inactiveNote"),
       rollResult: document.querySelector("#rollResult"),
       rollActions: document.querySelector("#rollActions"),
-      retryRoll: document.querySelector("#retryRoll"),
       endBattle: document.querySelector("#endBattle"),
       timerNote: document.querySelector("#timerNote"),
+      decayDialog: document.querySelector("#decayDialog"),
+      decayDialogPrompt: document.querySelector("#decayDialogPrompt"),
       historyList: document.querySelector("#historyList")
     };
 
@@ -613,7 +656,7 @@
     }
 
     function checkThreshold() {
-      if (state.activeForm === "reed" && !state.decayActive && state.rage >= state.threshold && !state.rollStatus) {
+      if (state.activeForm === "reed" && !state.decayActive && state.rage >= state.threshold && !state.rollStatus && state.lastOutcome !== true) {
         state.rollStatus = "pending";
         state.rollKind = "initial";
       } else if (state.rage < state.threshold && state.rollKind === "initial") {
@@ -674,17 +717,20 @@
 
     function renderRoll() {
       const dc = 10 + state.rage - state.threshold;
-      elements.rollActions.hidden = state.rollStatus !== "pending";
-      elements.retryRoll.hidden = !(state.rollStatus === "failed" && state.rollKind === "initial");
+      elements.rollActions.hidden = state.rollStatus !== "pending" || state.rollKind !== "initial";
       if (state.rollStatus === "pending") {
         const title = state.rollKind === "decay" ? "Afbouwcontrole" : "Transformatiecontrole";
         elements.rollResult.innerHTML = `<p class="roll-line">${title} · <strong>DC ${dc}</strong></p><p class="roll-detail">Werp zelf en kies hieronder de uitkomst.</p>`;
-      } else if (state.rollStatus === "failed") {
-        elements.rollResult.innerHTML = '<p class="roll-line failed">Worp mislukt</p><p class="roll-detail">Je kunt opnieuw werpen.</p>';
       } else if (state.lastOutcome !== null) {
         elements.rollResult.innerHTML = `<p class="roll-line ${state.lastOutcome ? "" : "failed"}">${state.lastOutcome ? "Worp geslaagd" : "Worp mislukt"}</p>`;
       } else {
         elements.rollResult.innerHTML = "";
+      }
+      if (state.rollStatus === "pending" && state.rollKind === "decay") {
+        elements.decayDialogPrompt.textContent = `De woede is ${state.rage}. Werp tegen DC ${dc} en geef de uitkomst aan.`;
+        if (!elements.decayDialog.open) elements.decayDialog.showModal();
+      } else if (elements.decayDialog.open) {
+        elements.decayDialog.close();
       }
     }
 
@@ -706,9 +752,10 @@
       document.body.classList.toggle("form-reed", state.activeForm === "reed");
       const thresholdReached = state.rage >= state.threshold;
       const scale = Math.max(state.threshold, state.rage, 1);
-      const showDc = state.rollStatus === "pending" || (state.activeForm === "reed" && thresholdReached && !state.decayActive);
+      const showDc = state.rollStatus === "pending" || (state.activeForm === "reed" && thresholdReached && !state.decayActive && state.lastOutcome !== true);
       const dc = 10 + state.rage - state.threshold;
-      elements.threshold.value = state.threshold;
+      elements.level.value = state.level;
+      elements.thresholdValue.textContent = `DREMPEL ${state.threshold}`;
       elements.score.textContent = state.rage;
       elements.scoreCaption.textContent = thresholdReached ? `${state.rage - state.threshold} boven de drempel` : `${state.threshold - state.rage} tot de drempel`;
       elements.meterFill.style.width = `${Math.min(100, (state.rage / scale) * 100)}%`;
@@ -779,10 +826,7 @@
       state.lastOutcome = success;
       state.rollStatus = null;
       state.rollKind = null;
-      if (!success && kind === "initial") {
-        state.rollStatus = "failed";
-        state.rollKind = "initial";
-      } else if (success && kind === "initial" && state.activeForm === "reed") {
+      if (!success && kind === "initial" && state.activeForm === "reed") {
         transformTo("smash");
       } else if (success && kind === "decay" && state.activeForm === "smash") {
         transformTo("reed");
@@ -821,6 +865,20 @@
     });
 
     elements.eventDelta.addEventListener("input", () => elements.eventDelta.setCustomValidity(""));
+    function syncOtherFormHp(formName, fieldName) {
+      const source = state.forms[formName];
+      const otherFormName = formName === "reed" ? "smash" : "reed";
+      const target = state.forms[otherFormName];
+      if (fieldName === "tempHp") {
+        target.tempHp = source.tempHp;
+        return;
+      }
+      if (fieldName === "currentHp") state.hpRatio = source.maxHp > 0 ? source.currentHp / source.maxHp : 0;
+      for (const form of Object.keys(FORM_NAMES)) {
+        state.forms[form].currentHp = Math.round(state.forms[form].maxHp * state.hpRatio);
+      }
+    }
+
     document.querySelectorAll("[data-form][data-hp]").forEach(input => {
       input.addEventListener("change", () => {
         const form = state.forms[input.dataset.form];
@@ -828,18 +886,21 @@
         form[field] = nonNegativeInteger(input.value);
         if (field === "maxHp") form.currentHp = Math.min(form.currentHp, form.maxHp);
         if (field === "currentHp") form.currentHp = Math.min(form.currentHp, form.maxHp);
+        syncOtherFormHp(input.dataset.form, field);
+        input.value = form[field];
         render();
       });
     });
 
-    elements.threshold.addEventListener("change", () => {
-      const parsed = Number(elements.threshold.value);
-      if (Number.isInteger(parsed) && parsed >= 0) {
-        state.threshold = parsed;
+    elements.level.addEventListener("change", () => {
+      const parsed = Number(elements.level.value);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 20) {
+        state.level = parsed;
+        state.threshold = thresholdForLevel(parsed);
         state.lastOutcome = null;
         checkThreshold();
-        render();
       }
+      render();
     });
 
     elements.rollActions.addEventListener("click", event => {
@@ -847,11 +908,11 @@
       if (choice) resolveRoll(choice.dataset.roll === "success");
     });
 
-    elements.retryRoll.addEventListener("click", () => {
-      state.rollStatus = "pending";
-      state.lastOutcome = null;
-      render();
+    elements.decayDialog.addEventListener("click", event => {
+      const choice = event.target.closest("[data-decay-roll]");
+      if (choice) resolveRoll(choice.dataset.decayRoll === "success");
     });
+    elements.decayDialog.addEventListener("cancel", event => event.preventDefault());
 
     elements.endBattle.addEventListener("click", () => {
       state.decayActive = true;
