@@ -536,8 +536,11 @@
           </label>
           <div class="online-actions">
             <button id="connectSharedTracker" class="online-button" type="button">Verbinden</button>
-            <button id="copyShareCode" class="online-button secondary" type="button" disabled>Kopieer code</button>
+            <button id="copyShareCode" class="online-button secondary" type="button" disabled>Kopieer uitnodigingslink</button>
           </div>
+          <label class="online-field share-code-field" for="inviteLink">Uitnodigingslink
+            <input id="inviteLink" class="online-input" type="text" readonly placeholder="Verschijnt zodra je een deelcode maakt" spellcheck="false">
+          </label>
           <button id="disconnectSharedTracker" class="online-button secondary" type="button" hidden>Terug naar lokaal</button>
           <button id="revokeShareCode" class="online-button secondary" type="button" hidden>Deelcode intrekken</button>
           <p id="syncStatus" class="sync-status" role="status" aria-live="polite"></p>
@@ -573,6 +576,10 @@
     const ONLINE_CONFIG_KEY = "reed-smash-online";
     const SHARE_CODE_KEY = "reed-smash-share-code";
     const ONLINE_POLL_INTERVAL = 3000;
+    const DEFAULT_ONLINE_CONFIG = {
+      url: "https://lfmyoultplptgnwapqmm.supabase.co",
+      key: "sb_publishable_UBVS-h6h5eaq6hlEHvRqOQ_oiEizkdq"
+    };
     const FORM_NAMES = { reed: "Dr. Reed", smash: "Smash" };
     const defaultState = {
       activeForm: "reed",
@@ -694,6 +701,7 @@
       saveOnlineConfig: document.querySelector("#saveOnlineConfig"),
       createSharedTracker: document.querySelector("#createSharedTracker"),
       shareCode: document.querySelector("#shareCode"),
+      inviteLink: document.querySelector("#inviteLink"),
       connectSharedTracker: document.querySelector("#connectSharedTracker"),
       copyShareCode: document.querySelector("#copyShareCode"),
       disconnectSharedTracker: document.querySelector("#disconnectSharedTracker"),
@@ -705,11 +713,13 @@
     function loadOnlineConfig() {
       try {
         const saved = JSON.parse(localStorage.getItem(ONLINE_CONFIG_KEY));
-        return saved && typeof saved.url === "string" && typeof saved.key === "string"
-          ? { url: saved.url, key: saved.key, token: localStorage.getItem(SHARE_CODE_KEY) || "" }
-          : { url: "", key: "", token: "" };
+        return {
+          url: typeof saved?.url === "string" && saved.url ? saved.url : DEFAULT_ONLINE_CONFIG.url,
+          key: typeof saved?.key === "string" && saved.key ? saved.key : DEFAULT_ONLINE_CONFIG.key,
+          token: localStorage.getItem(SHARE_CODE_KEY) || ""
+        };
       } catch {
-        return { url: "", key: "", token: "" };
+        return { ...DEFAULT_ONLINE_CONFIG, token: "" };
       }
     }
 
@@ -724,6 +734,7 @@
     elements.supabaseUrl.value = onlineConfig.url;
     elements.supabaseKey.value = onlineConfig.key;
     elements.shareCode.value = onlineConfig.token;
+    elements.inviteLink.value = onlineConfig.token && onlineConfig.url && onlineConfig.key ? buildInviteLink(onlineConfig.token) : "";
     elements.copyShareCode.disabled = !onlineConfig.token;
     elements.disconnectSharedTracker.hidden = !onlineConfig.token;
     elements.revokeShareCode.hidden = !onlineConfig.token;
@@ -744,6 +755,24 @@
     function setSyncStatus(message, isError = false) {
       elements.syncStatus.textContent = message;
       elements.syncStatus.classList.toggle("error", isError);
+    }
+
+    function buildInviteLink(token) {
+      if (!window.location?.href || !onlineConfig.url || !onlineConfig.key || !token) return "";
+      const inviteUrl = new URL(window.location.href);
+      inviteUrl.hash = new URLSearchParams({ share: token, url: onlineConfig.url, key: onlineConfig.key }).toString();
+      return inviteUrl.href;
+    }
+
+    function updateInviteLink() {
+      elements.inviteLink.value = buildInviteLink(onlineConfig.token);
+    }
+
+    function readInviteFromUrl() {
+      if (!window.location?.hash) return null;
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      if (!params.has("share")) return null;
+      return { token: params.get("share") || "", url: params.get("url") || "", key: params.get("key") || "" };
     }
 
     function setOnlineConnected(connected) {
@@ -771,6 +800,7 @@
       const config = readOnlineConfig();
       onlineConfig = { ...config, token: onlineConfig.token };
       localStorage.setItem(ONLINE_CONFIG_KEY, JSON.stringify({ url: config.url, key: config.key }));
+      updateInviteLink();
       setSyncStatus("Supabase-config opgeslagen op dit apparaat.");
     }
 
@@ -809,6 +839,7 @@
       elements.shareCode.value = token;
       elements.copyShareCode.disabled = !token;
       elements.disconnectSharedTracker.hidden = !token;
+      updateInviteLink();
     }
 
     function beginOnlinePolling() {
@@ -1249,20 +1280,35 @@
     elements.revokeShareCode.addEventListener("click", revokeSharedTracker);
     elements.copyShareCode.addEventListener("click", async () => {
       if (!onlineConfig.token) return;
+      const inviteLink = buildInviteLink(onlineConfig.token);
+      if (!inviteLink) {
+        setSyncStatus("Sla eerst de Supabase-projectconfiguratie op.", true);
+        return;
+      }
       try {
-        await navigator.clipboard.writeText(onlineConfig.token);
-        setSyncStatus("Deelcode gekopieerd.");
+        await navigator.clipboard.writeText(inviteLink);
+        setSyncStatus("Uitnodigingslink gekopieerd. Je DM hoeft alleen de link te openen.");
       } catch {
-        elements.shareCode.focus();
-        elements.shareCode.select();
-        setSyncStatus("De code is geselecteerd; kopieer deze handmatig.");
+        elements.inviteLink.focus();
+        elements.inviteLink.select();
+        setSyncStatus("De uitnodigingslink is geselecteerd; kopieer hem handmatig.");
       }
     });
 
     checkThreshold();
     render();
     if (state.decayActive && state.rollStatus !== "pending") setCountdown();
-    if (onlineConfig.token) {
+    const invite = readInviteFromUrl();
+    if (invite) {
+      onlineConfig = invite;
+      elements.supabaseUrl.value = invite.url;
+      elements.supabaseKey.value = invite.key;
+      elements.shareCode.value = invite.token;
+      setSyncStatus("Uitnodiging openen…");
+      connectSharedTracker(true).then(() => {
+        if (onlineConnected) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      });
+    } else if (onlineConfig.token) {
       setSyncStatus("Gedeelde tracker herstellen…");
       connectSharedTracker(true);
     }
