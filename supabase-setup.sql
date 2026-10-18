@@ -24,7 +24,8 @@ begin
   end if;
 
   insert into public.shared_trackers (token_hash, state)
-  values (encode(extensions.digest(convert_to(p_token, 'UTF8'), 'sha256'), 'hex'), p_state);
+  values (encode(extensions.digest(convert_to(p_token, 'UTF8'), 'sha256'), 'hex'), p_state)
+  on conflict (token_hash) do nothing;
 end;
 $function$;
 

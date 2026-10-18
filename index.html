@@ -97,6 +97,8 @@
       font: italic 16px var(--serif);
     }
 
+    .online-badge { display: inline-block; margin-right: 8px; color: var(--green-dark); font: 700 9px var(--sans); text-transform: uppercase; }
+
     .layout {
       display: grid;
       grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr);
@@ -405,7 +407,7 @@
         <p class="eyebrow">Odysee of the drakenlord</p>
         <h1>Dr. Reed / Smash</h1>
       </div>
-      <p class="masthead-note">Twee vormen, één woedemeter.</p>
+      <p class="masthead-note"><span id="onlineBadge" class="online-badge">Verbinden…</span>Twee vormen, één woedemeter.</p>
     </header>
 
     <div class="layout">
@@ -514,10 +516,9 @@
           <p id="timerNote" class="timer-note" aria-live="polite"></p>
         </section>
 
-        <section class="online-section" aria-label="Online delen">
+        <section class="online-section" aria-label="Online delen" hidden>
           <div class="online-heading">
             <h2 class="section-title">Online delen</h2>
-            <span id="onlineBadge" class="micro-label">Lokaal</span>
           </div>
           <div class="online-fields">
             <label class="online-field" for="supabaseUrl">Supabase project-URL
@@ -557,7 +558,7 @@
     </div>
 
     <footer class="footer">
-      <span>Je gegevens worden lokaal bewaard.</span>
+      <span>Lokaal bewaard en online gedeeld zodra verbonden.</span>
       <button id="resetAll" class="reset-button" type="button">Alles resetten</button>
     </footer>
   </main>
@@ -576,6 +577,7 @@
     const ONLINE_CONFIG_KEY = "reed-smash-online";
     const SHARE_CODE_KEY = "reed-smash-share-code";
     const ONLINE_POLL_INTERVAL = 3000;
+    const PUBLIC_TRACKER_TOKEN = "reed-smash-github-pages-public".padEnd(64, "0");
     const DEFAULT_ONLINE_CONFIG = {
       url: "https://lfmyoultplptgnwapqmm.supabase.co",
       key: "sb_publishable_UBVS-h6h5eaq6hlEHvRqOQ_oiEizkdq"
@@ -723,7 +725,7 @@
       }
     }
 
-    let onlineConfig = loadOnlineConfig();
+    let onlineConfig = { ...DEFAULT_ONLINE_CONFIG, token: PUBLIC_TRACKER_TOKEN };
     let onlineConnected = false;
     let applyingRemoteState = false;
     let onlinePollHandle = null;
@@ -921,6 +923,30 @@
         setSyncStatus("Gedeelde tracker aangemaakt. Kopieer de deelcode voor je DM.");
       } catch (error) {
         setSyncStatus(`Delen starten mislukt: ${error.message}`, true);
+      }
+    }
+
+    async function connectPublicTracker() {
+      onlineConfig = { ...DEFAULT_ONLINE_CONFIG, token: PUBLIC_TRACKER_TOKEN };
+      try {
+        await callOnlineFunction("create_shared_tracker", { p_token: PUBLIC_TRACKER_TOKEN, p_state: state });
+        const result = await callOnlineFunction("get_shared_tracker", { p_token: PUBLIC_TRACKER_TOKEN });
+        if (!result || !result.state || typeof result.state !== "object") throw new Error("De gedeelde tracker bevat geen geldige gegevens.");
+        if (timerHandle) clearInterval(timerHandle);
+        timerHandle = null;
+        applyingRemoteState = true;
+        state = normalizeState(result.state);
+        lastCloudState = stableSerialize(state);
+        render();
+        applyingRemoteState = false;
+        setOnlineConnected(true);
+        if (state.decayActive && state.rollStatus !== "pending") setCountdown();
+        beginOnlinePolling();
+        setSyncStatus("De openbare tracker is online gedeeld.");
+      } catch (error) {
+        applyingRemoteState = false;
+        setOnlineConnected(false);
+        setSyncStatus(`Online verbinden mislukt: ${error.message}`, true);
       }
     }
 
@@ -1297,21 +1323,8 @@
 
     checkThreshold();
     render();
-    if (state.decayActive && state.rollStatus !== "pending") setCountdown();
-    const invite = readInviteFromUrl();
-    if (invite) {
-      onlineConfig = invite;
-      elements.supabaseUrl.value = invite.url;
-      elements.supabaseKey.value = invite.key;
-      elements.shareCode.value = invite.token;
-      setSyncStatus("Uitnodiging openen…");
-      connectSharedTracker(true).then(() => {
-        if (onlineConnected) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      });
-    } else if (onlineConfig.token) {
-      setSyncStatus("Gedeelde tracker herstellen…");
-      connectSharedTracker(true);
-    }
+    setSyncStatus("Verbinden met de openbare tracker…");
+    connectPublicTracker();
   </script>
 </body>
 </html>
