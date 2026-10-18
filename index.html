@@ -338,6 +338,19 @@
     .dialog-choice { min-height: 44px; padding: 9px; border: 1px solid var(--green-dark); color: #fff; background: var(--green); cursor: pointer; font-size: 11px; font-weight: 700; }
     .dialog-choice.fail { border-color: var(--rust); background: var(--rust); }
 
+    .online-section { padding: 22px 0; border-bottom: 1px solid var(--line); }
+    .online-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .online-fields { display: grid; gap: 9px; }
+    .online-field { display: grid; gap: 5px; color: var(--muted); font-size: 9px; font-weight: 700; }
+    .online-input { width: 100%; min-width: 0; height: 38px; padding: 0 9px; border: 1px solid var(--line); border-radius: 0; outline: 0; color: var(--ink); background: var(--paper-light); font-size: 11px; }
+    .online-input:focus { border-color: var(--green-dark); box-shadow: 0 0 0 2px rgba(56,95,76,.12); }
+    .online-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+    .online-button { min-height: 39px; padding: 8px; border: 1px solid var(--green-dark); color: #fff; background: var(--green); cursor: pointer; font-size: 10px; font-weight: 700; }
+    .online-button.secondary { color: var(--ink); background: transparent; }
+    .share-code-field { margin-top: 10px; }
+    .sync-status { min-height: 16px; margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .sync-status.error { color: var(--rust); }
+
     .history { padding-top: 22px; }
     .history-heading { margin-bottom: 12px; }
     .clear-button { padding: 3px 0; border: 0; color: var(--muted); background: none; cursor: pointer; font-size: 10px; text-decoration: underline; text-underline-offset: 3px; }
@@ -501,6 +514,35 @@
           <p id="timerNote" class="timer-note" aria-live="polite"></p>
         </section>
 
+        <section class="online-section" aria-label="Online delen">
+          <div class="online-heading">
+            <h2 class="section-title">Online delen</h2>
+            <span id="onlineBadge" class="micro-label">Lokaal</span>
+          </div>
+          <div class="online-fields">
+            <label class="online-field" for="supabaseUrl">Supabase project-URL
+              <input id="supabaseUrl" class="online-input" type="url" placeholder="https://jouw-project.supabase.co" autocomplete="url">
+            </label>
+            <label class="online-field" for="supabaseKey">Publishable / anon key
+              <input id="supabaseKey" class="online-input" type="text" placeholder="sb_publishable_..." autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <div class="online-actions">
+            <button id="saveOnlineConfig" class="online-button secondary" type="button">Config opslaan</button>
+            <button id="createSharedTracker" class="online-button" type="button">Nieuwe deelcode</button>
+          </div>
+          <label class="online-field share-code-field" for="shareCode">Deelcode
+            <input id="shareCode" class="online-input" type="text" placeholder="Plak de code van je DM" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="online-actions">
+            <button id="connectSharedTracker" class="online-button" type="button">Verbinden</button>
+            <button id="copyShareCode" class="online-button secondary" type="button" disabled>Kopieer code</button>
+          </div>
+          <button id="disconnectSharedTracker" class="online-button secondary" type="button" hidden>Terug naar lokaal</button>
+          <button id="revokeShareCode" class="online-button secondary" type="button" hidden>Deelcode intrekken</button>
+          <p id="syncStatus" class="sync-status" role="status" aria-live="polite"></p>
+        </section>
+
         <section class="history">
           <div class="history-heading">
             <h2 class="section-title">Gebeurtenissenlog</h2>
@@ -528,6 +570,9 @@
 
   <script>
     const STORAGE_KEY = "reed-smash-tracker";
+    const ONLINE_CONFIG_KEY = "reed-smash-online";
+    const SHARE_CODE_KEY = "reed-smash-share-code";
+    const ONLINE_POLL_INTERVAL = 3000;
     const FORM_NAMES = { reed: "Dr. Reed", smash: "Smash" };
     const defaultState = {
       activeForm: "reed",
@@ -563,14 +608,8 @@
       return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
     }
 
-    function loadState() {
-      try {
-        let saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (!saved) {
-          const previous = JSON.parse(localStorage.getItem("ragetracker"));
-          if (previous && typeof previous === "object") saved = { ...previous, rage: previous.value };
-        }
-        if (!saved || typeof saved !== "object") return structuredClone(defaultState);
+    function normalizeState(saved) {
+      if (!saved || typeof saved !== "object") return structuredClone(defaultState);
         const forms = {};
         for (const form of Object.keys(FORM_NAMES)) {
           const source = saved.forms?.[form] || {};
@@ -610,6 +649,16 @@
           rollKind: saved.rollStatus === "pending" && ["initial", "decay"].includes(saved.rollKind) ? saved.rollKind : null,
           lastOutcome: typeof saved.lastOutcome === "boolean" ? saved.lastOutcome : null
         };
+    }
+
+    function loadState() {
+      try {
+        let saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (!saved) {
+          const previous = JSON.parse(localStorage.getItem("ragetracker"));
+          if (previous && typeof previous === "object") saved = { ...previous, rage: previous.value };
+        }
+        return normalizeState(saved);
       } catch {
         return structuredClone(defaultState);
       }
@@ -639,11 +688,258 @@
       timerNote: document.querySelector("#timerNote"),
       decayDialog: document.querySelector("#decayDialog"),
       decayDialogPrompt: document.querySelector("#decayDialogPrompt"),
-      historyList: document.querySelector("#historyList")
+      historyList: document.querySelector("#historyList"),
+      supabaseUrl: document.querySelector("#supabaseUrl"),
+      supabaseKey: document.querySelector("#supabaseKey"),
+      saveOnlineConfig: document.querySelector("#saveOnlineConfig"),
+      createSharedTracker: document.querySelector("#createSharedTracker"),
+      shareCode: document.querySelector("#shareCode"),
+      connectSharedTracker: document.querySelector("#connectSharedTracker"),
+      copyShareCode: document.querySelector("#copyShareCode"),
+      disconnectSharedTracker: document.querySelector("#disconnectSharedTracker"),
+      revokeShareCode: document.querySelector("#revokeShareCode"),
+      syncStatus: document.querySelector("#syncStatus"),
+      onlineBadge: document.querySelector("#onlineBadge")
     };
+
+    function loadOnlineConfig() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(ONLINE_CONFIG_KEY));
+        return saved && typeof saved.url === "string" && typeof saved.key === "string"
+          ? { url: saved.url, key: saved.key, token: localStorage.getItem(SHARE_CODE_KEY) || "" }
+          : { url: "", key: "", token: "" };
+      } catch {
+        return { url: "", key: "", token: "" };
+      }
+    }
+
+    let onlineConfig = loadOnlineConfig();
+    let onlineConnected = false;
+    let applyingRemoteState = false;
+    let onlinePollHandle = null;
+    let cloudSaveHandle = null;
+    let lastCloudState = null;
+    let pollingRemote = false;
+
+    elements.supabaseUrl.value = onlineConfig.url;
+    elements.supabaseKey.value = onlineConfig.key;
+    elements.shareCode.value = onlineConfig.token;
+    elements.copyShareCode.disabled = !onlineConfig.token;
+    elements.disconnectSharedTracker.hidden = !onlineConfig.token;
+    elements.revokeShareCode.hidden = !onlineConfig.token;
 
     function saveState() {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* Storage can be unavailable in private browsing. */ }
+      if (onlineConnected && !applyingRemoteState) scheduleCloudSave();
+    }
+
+    function stableSerialize(value) {
+      if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+      if (value && typeof value === "object") {
+        return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
+      }
+      return JSON.stringify(value);
+    }
+
+    function setSyncStatus(message, isError = false) {
+      elements.syncStatus.textContent = message;
+      elements.syncStatus.classList.toggle("error", isError);
+    }
+
+    function setOnlineConnected(connected) {
+      onlineConnected = connected;
+      elements.onlineBadge.textContent = connected ? "Gedeeld" : "Lokaal";
+      elements.disconnectSharedTracker.hidden = !onlineConfig.token;
+      elements.revokeShareCode.hidden = !connected || !onlineConfig.token;
+    }
+
+    function readOnlineConfig() {
+      const urlValue = elements.supabaseUrl.value.trim();
+      const key = elements.supabaseKey.value.trim();
+      if (!urlValue || !key) throw new Error("Vul de Supabase project-URL en publishable key in.");
+      const parsedUrl = new URL(urlValue);
+      if (parsedUrl.protocol !== "https:" || parsedUrl.pathname !== "/" || parsedUrl.search || parsedUrl.hash) {
+        throw new Error("Gebruik de volledige HTTPS-project-URL van Supabase.");
+      }
+      if (key.startsWith("sb_secret_") || key.startsWith("service_role")) {
+        throw new Error("Gebruik de publishable/anon key, nooit de secret- of service_role-key.");
+      }
+      return { url: parsedUrl.origin, key };
+    }
+
+    function saveOnlineConfig() {
+      const config = readOnlineConfig();
+      onlineConfig = { ...config, token: onlineConfig.token };
+      localStorage.setItem(ONLINE_CONFIG_KEY, JSON.stringify({ url: config.url, key: config.key }));
+      setSyncStatus("Supabase-config opgeslagen op dit apparaat.");
+    }
+
+    async function callOnlineFunction(functionName, parameters) {
+      if (!onlineConfig.url || !onlineConfig.key) throw new Error("Vul eerst de Supabase-configuratie in.");
+      const response = await fetch(`${onlineConfig.url}/rest/v1/rpc/${functionName}`, {
+        method: "POST",
+        headers: {
+          apikey: onlineConfig.key,
+          Authorization: `Bearer ${onlineConfig.key}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(parameters)
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        let detail = responseText;
+        try {
+          const errorBody = JSON.parse(responseText);
+          detail = errorBody.message || errorBody.details || responseText;
+        } catch { /* Keep the raw server response for diagnostics. */ }
+        throw new Error(detail || `Supabase gaf HTTP ${response.status}.`);
+      }
+      return responseText ? JSON.parse(responseText) : null;
+    }
+
+    function createShareToken() {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    function storeShareCode(token) {
+      onlineConfig.token = token;
+      if (token) localStorage.setItem(SHARE_CODE_KEY, token);
+      else localStorage.removeItem(SHARE_CODE_KEY);
+      elements.shareCode.value = token;
+      elements.copyShareCode.disabled = !token;
+      elements.disconnectSharedTracker.hidden = !token;
+    }
+
+    function beginOnlinePolling() {
+      if (onlinePollHandle) clearInterval(onlinePollHandle);
+      onlinePollHandle = setInterval(pollSharedTracker, ONLINE_POLL_INTERVAL);
+      pollSharedTracker();
+    }
+
+    function stopOnlineTimers() {
+      if (onlinePollHandle) clearInterval(onlinePollHandle);
+      if (cloudSaveHandle) clearTimeout(cloudSaveHandle);
+      onlinePollHandle = null;
+      cloudSaveHandle = null;
+      setOnlineConnected(false);
+    }
+
+    function scheduleCloudSave() {
+      if (!onlineConnected || applyingRemoteState) return;
+      if (cloudSaveHandle) clearTimeout(cloudSaveHandle);
+      cloudSaveHandle = setTimeout(async () => {
+        cloudSaveHandle = null;
+        if (!onlineConnected) return;
+        const snapshot = structuredClone(state);
+        const snapshotText = stableSerialize(snapshot);
+        if (snapshotText === lastCloudState) return;
+        try {
+          await callOnlineFunction("save_shared_tracker", { p_token: onlineConfig.token, p_state: snapshot });
+          lastCloudState = snapshotText;
+          setSyncStatus("Online opgeslagen.");
+          if (stableSerialize(state) !== snapshotText) scheduleCloudSave();
+        } catch (error) {
+          setSyncStatus(`Online opslaan mislukt: ${error.message}`, true);
+        }
+      }, 700);
+    }
+
+    async function pollSharedTracker() {
+      if (!onlineConnected || pollingRemote) return;
+      pollingRemote = true;
+      try {
+        const result = await callOnlineFunction("get_shared_tracker", { p_token: onlineConfig.token });
+        if (!result || !result.state || typeof result.state !== "object") throw new Error("De gedeelde tracker bevat geen geldige gegevens.");
+        const remoteState = normalizeState(result.state);
+        const remoteText = stableSerialize(remoteState);
+        if (remoteText !== lastCloudState) {
+          if (cloudSaveHandle || stableSerialize(state) !== lastCloudState) {
+            setSyncStatus("Er zijn wijzigingen van jullie allebei; de lokale wijziging wordt opgeslagen.");
+          } else {
+            applyingRemoteState = true;
+            if (timerHandle) clearInterval(timerHandle);
+            timerHandle = null;
+            state = remoteState;
+            lastCloudState = remoteText;
+            render();
+            applyingRemoteState = false;
+            if (state.decayActive && state.rollStatus !== "pending") setCountdown();
+            setSyncStatus("Wijzigingen van de DM ontvangen.");
+          }
+        }
+      } catch (error) {
+        setSyncStatus(`Online ophalen mislukt: ${error.message}`, true);
+      } finally {
+        pollingRemote = false;
+      }
+    }
+
+    async function createSharedTracker() {
+      try {
+        const config = readOnlineConfig();
+        stopOnlineTimers();
+        onlineConfig = { ...config, token: "" };
+        localStorage.setItem(ONLINE_CONFIG_KEY, JSON.stringify(config));
+        const token = createShareToken();
+        await callOnlineFunction("create_shared_tracker", { p_token: token, p_state: state });
+        storeShareCode(token);
+        lastCloudState = stableSerialize(state);
+        setOnlineConnected(true);
+        beginOnlinePolling();
+        setSyncStatus("Gedeelde tracker aangemaakt. Kopieer de deelcode voor je DM.");
+      } catch (error) {
+        setSyncStatus(`Delen starten mislukt: ${error.message}`, true);
+      }
+    }
+
+    async function connectSharedTracker(restore = false) {
+      try {
+        const config = readOnlineConfig();
+        const token = elements.shareCode.value.trim().toLowerCase();
+        if (!/^[0-9a-f]{64}$/.test(token)) throw new Error("De deelcode moet 64 tekens bevatten.");
+        if (!restore && !window.confirm("Verbinden vervangt de huidige lokale tracker door de gedeelde gegevens. Doorgaan?")) return;
+        stopOnlineTimers();
+        if (timerHandle) clearInterval(timerHandle);
+        timerHandle = null;
+        onlineConfig = { ...config, token };
+        localStorage.setItem(ONLINE_CONFIG_KEY, JSON.stringify(config));
+        const result = await callOnlineFunction("get_shared_tracker", { p_token: token });
+        if (!result || !result.state || typeof result.state !== "object") throw new Error("De gedeelde tracker bevat geen geldige gegevens.");
+        storeShareCode(token);
+        applyingRemoteState = true;
+        state = normalizeState(result.state);
+        lastCloudState = stableSerialize(state);
+        render();
+        applyingRemoteState = false;
+        setOnlineConnected(true);
+        if (state.decayActive && state.rollStatus !== "pending") setCountdown();
+        beginOnlinePolling();
+        setSyncStatus("Verbonden. Wijzigingen worden automatisch gedeeld.");
+      } catch (error) {
+        applyingRemoteState = false;
+        setSyncStatus(`Verbinden mislukt: ${error.message}`, true);
+      }
+    }
+
+    function disconnectSharedTracker() {
+      stopOnlineTimers();
+      setOnlineConnected(false);
+      storeShareCode("");
+      lastCloudState = null;
+      setSyncStatus("Je gebruikt deze tracker nu alleen lokaal.");
+    }
+
+    async function revokeSharedTracker() {
+      if (!onlineConfig.token || !onlineConnected) return;
+      if (!window.confirm("De deelcode intrekken? Jij en je DM worden losgekoppeld en de online tracker wordt verwijderd.")) return;
+      try {
+        await callOnlineFunction("revoke_shared_tracker", { p_token: onlineConfig.token });
+        disconnectSharedTracker();
+        setSyncStatus("De deelcode is ingetrokken en de online tracker verwijderd.");
+      } catch (error) {
+        setSyncStatus(`Deelcode intrekken mislukt: ${error.message}`, true);
+      }
     }
 
     function escapeHtml(value) {
@@ -785,6 +1081,11 @@
       if (!state.nextDecayAt) state.nextDecayAt = Date.now() + 30000;
       if (timerHandle) clearInterval(timerHandle);
       timerHandle = setInterval(() => {
+        if (!state.decayActive || state.rollStatus === "pending") {
+          clearInterval(timerHandle);
+          timerHandle = null;
+          return;
+        }
         if (state.nextDecayAt > Date.now()) {
           renderTimer();
           return;
@@ -934,9 +1235,37 @@
       render();
     });
 
+    elements.saveOnlineConfig.addEventListener("click", () => {
+      try {
+        saveOnlineConfig();
+      } catch (error) {
+        setSyncStatus(error.message, true);
+      }
+    });
+
+    elements.createSharedTracker.addEventListener("click", createSharedTracker);
+    elements.connectSharedTracker.addEventListener("click", () => connectSharedTracker());
+    elements.disconnectSharedTracker.addEventListener("click", disconnectSharedTracker);
+    elements.revokeShareCode.addEventListener("click", revokeSharedTracker);
+    elements.copyShareCode.addEventListener("click", async () => {
+      if (!onlineConfig.token) return;
+      try {
+        await navigator.clipboard.writeText(onlineConfig.token);
+        setSyncStatus("Deelcode gekopieerd.");
+      } catch {
+        elements.shareCode.focus();
+        elements.shareCode.select();
+        setSyncStatus("De code is geselecteerd; kopieer deze handmatig.");
+      }
+    });
+
     checkThreshold();
     render();
     if (state.decayActive && state.rollStatus !== "pending") setCountdown();
+    if (onlineConfig.token) {
+      setSyncStatus("Gedeelde tracker herstellen…");
+      connectSharedTracker(true);
+    }
   </script>
 </body>
 </html>
