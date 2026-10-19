@@ -208,7 +208,10 @@
     .events-heading, .history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .events-heading { margin-bottom: 11px; }
     .section-title { margin: 0; font: 21px var(--serif); }
-    .events-list { display: grid; gap: 8px; }
+    .events-list { display: grid; gap: 20px; }
+    .event-group { display: grid; gap: 8px; }
+    .event-group-title { margin: 0 0 2px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+    .event-group-list { display: grid; gap: 8px; }
 
     .event-row {
       display: grid;
@@ -1071,15 +1074,29 @@
     }
 
     function renderActions() {
-      elements.eventsList.innerHTML = state.actions.map(action => `
-        <div class="event-row">
-          <button class="event-button" type="button" data-action="${escapeHtml(action.id)}" aria-label="${escapeHtml(action.label)}, ${action.delta > 0 ? "plus " : "min "}${Math.abs(action.delta)}">
-            <span class="event-name">${escapeHtml(action.label)}</span>
-            <span class="event-delta ${action.delta < 0 ? "negative" : ""}">${action.delta > 0 ? "+" : ""}${action.delta}</span>
-          </button>
-          <span></span>
-          <button class="remove-event" type="button" data-remove="${escapeHtml(action.id)}" aria-label="Verwijder ${escapeHtml(action.label)}" title="Gebeurtenis verwijderen">×</button>
-        </div>`).join("");
+      const groups = [
+        { label: "Bondgenoten en burgers", ids: ["ally-attacked", "ally-grabbed", "ally-thrown", "ally-unconscious", "ally-dies", "ally-threatened", "ally-hostage", "ally-insulted", "civilians-shield", "innocent-abused", "ally-attacked-again", "enemy-escapes-injuring-ally", "rescue-failed", "rescue-success"] },
+        { label: "Reed", ids: ["reed-mocked", "reed-called-weak", "reed-betrayed", "reed-manipulated", "trauma-reminder", "reed-heavy-hit", "reed-critical-hit", "reed-thrown", "reed-held-protecting", "reed-low-hp", "reed-controlled-threat", "reed-forced-retreat", "reed-controlled"] },
+        { label: "Smash", ids: ["smash-challenged-hit", "smash-attacked-wounded", "smash-calmed"] },
+        { label: "Rust en herstel", ids: ["safe-rest", "ally-thanks", "ally-reassures", "enemy-surrenders", "repair-notes-tools", "personal-goal"] }
+      ].map(group => ({ ...group, actions: state.actions.filter(action => group.ids.includes(action.id)) }));
+      const groupedIds = new Set(groups.flatMap(group => group.ids));
+      const customActions = state.actions.filter(action => !groupedIds.has(action.id));
+      if (customActions.length) groups.push({ label: "Eigen gebeurtenissen", actions: customActions });
+      elements.eventsList.innerHTML = groups.filter(group => group.actions.length).map(group => `
+        <section class="event-group">
+          <h3 class="event-group-title">${escapeHtml(group.label)}</h3>
+          <div class="event-group-list">${group.actions.map(action => `
+            <div class="event-row">
+              <button class="event-button" type="button" data-action="${escapeHtml(action.id)}" aria-label="${escapeHtml(action.label)}, ${action.delta > 0 ? "plus " : "min "}${Math.abs(action.delta)}">
+                <span class="event-name">${escapeHtml(action.label)}</span>
+                <span class="event-delta ${action.delta < 0 ? "negative" : ""}">${action.delta > 0 ? "+" : ""}${action.delta}</span>
+              </button>
+              <span></span>
+              <button class="remove-event" type="button" data-remove="${escapeHtml(action.id)}" aria-label="Verwijder ${escapeHtml(action.label)}" title="Gebeurtenis verwijderen">×</button>
+            </div>`).join("")}
+          </div>
+        </section>`).join("");
     }
 
     function renderHistory() {
@@ -1132,15 +1149,17 @@
     }
 
     function renderTimer() {
+      if (!state.decayActive) {
+        elements.timerNote.textContent = "";
+        return;
+      }
       if (state.nextDecayAt) {
         const seconds = Math.max(0, Math.ceil((state.nextDecayAt - Date.now()) / 1000));
         elements.timerNote.textContent = `Volgende woededaling over ${seconds} sec`;
       } else if (state.rollStatus === "pending" && state.rollKind === "decay") {
         elements.timerNote.textContent = "Worp nodig; timer wacht op je keuze.";
-      } else if (state.decayActive) {
-        elements.timerNote.textContent = "Afbouw actief.";
       } else {
-        elements.timerNote.textContent = "";
+        elements.timerNote.textContent = "Afbouw actief.";
       }
     }
 
@@ -1219,6 +1238,12 @@
         target.currentHp = Math.round(target.maxHp * hpRatio);
       }
       state.activeForm = form;
+      if (form === "smash" && state.decayActive) {
+        state.decayActive = false;
+        state.nextDecayAt = null;
+        if (timerHandle) clearInterval(timerHandle);
+        timerHandle = null;
+      }
       addHistory(`Transformatie naar ${FORM_NAMES[form]}`);
     }
 
