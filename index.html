@@ -576,6 +576,7 @@
     const STORAGE_KEY = "reed-smash-tracker";
     const ONLINE_CONFIG_KEY = "reed-smash-online";
     const SHARE_CODE_KEY = "reed-smash-share-code";
+    const MAX_RAGE = 20;
     const ONLINE_POLL_INTERVAL = 3000;
     const PUBLIC_TRACKER_TOKEN = "reed-smash-github-pages-public".padEnd(64, "0");
     const DEFAULT_ONLINE_CONFIG = {
@@ -594,8 +595,42 @@
         smash: { maxHp: 0, currentHp: 0, tempHp: 0 }
       },
       actions: [
-        { id: "strain", label: "Woede", delta: 1 },
-        { id: "calm", label: "Kalmeren", delta: -1 }
+        { id: "ally-attacked", label: "Een bondgenoot wordt bewust aangevallen", delta: 1 },
+        { id: "ally-grabbed", label: "Een bondgenoot wordt gegrepen of vastgehouden", delta: 1 },
+        { id: "ally-thrown", label: "Een bondgenoot wordt door een vijand weggeslingerd", delta: 2 },
+        { id: "ally-unconscious", label: "Een bondgenoot wordt bewusteloos geslagen", delta: 3 },
+        { id: "ally-dies", label: "Een bondgenoot sterft", delta: 5 },
+        { id: "ally-threatened", label: "Een vijand bedreigt een bondgenoot die niet kan terugvechten", delta: 2 },
+        { id: "ally-hostage", label: "Een bondgenoot wordt gegijzeld", delta: 3 },
+        { id: "reed-mocked", label: "Reed wordt uitgelachen of vernederd", delta: 1 },
+        { id: "reed-called-weak", label: "Iemand noemt Reed zwak of nutteloos", delta: 1 },
+        { id: "ally-insulted", label: "Iemand beledigt of bedreigt een bondgenoot", delta: 1 },
+        { id: "reed-betrayed", label: "Reed wordt bedrogen door iemand die hij vertrouwde", delta: 2 },
+        { id: "civilians-shield", label: "Iemand gebruikt onschuldige burgers als schild", delta: 2 },
+        { id: "innocent-abused", label: "Reed ziet een onschuldige mishandeld worden", delta: 2 },
+        { id: "reed-manipulated", label: "Iemand probeert Reed bewust te manipuleren", delta: 1 },
+        { id: "trauma-reminder", label: "Een vijand herinnert Reed aan een traumatische gebeurtenis", delta: 2 },
+        { id: "reed-heavy-hit", label: "Reed ontvangt in één aanval minstens 25% van zijn maximale HP als schade", delta: 1 },
+        { id: "reed-critical-hit", label: "Reed wordt kritisch geraakt", delta: 2 },
+        { id: "reed-thrown", label: "Reed wordt tegen een muur geslagen of weggeslingerd", delta: 2 },
+        { id: "reed-held-protecting", label: "Reed wordt vastgehouden terwijl hij probeert een bondgenoot te beschermen", delta: 2 },
+        { id: "reed-low-hp", label: "Reed zakt onder 25% van zijn maximale HP", delta: 3 },
+        { id: "reed-controlled-threat", label: "Een vijand probeert Reed te controleren of tegen zijn wil te gebruiken", delta: 2 },
+        { id: "reed-forced-retreat", label: "Reed wordt gedwongen zich terug te trekken", delta: 2 },
+        { id: "smash-challenged-hit", label: "Smash ontvangt schade van een vijand die hem net heeft uitgedaagd", delta: 1 },
+        { id: "smash-attacked-wounded", label: "Een vijand blijft Smash aanvallen terwijl hij al gewond is", delta: 1 },
+        { id: "ally-attacked-again", label: "Smash ziet een vijand opnieuw dezelfde bondgenoot aanvallen", delta: 2 },
+        { id: "enemy-escapes-injuring-ally", label: "Een vijand ontsnapt nadat hij een bondgenoot heeft verwond", delta: 2 },
+        { id: "rescue-failed", label: "Reed faalt in een belangrijke poging om iemand te redden", delta: 2 },
+        { id: "reed-controlled", label: "Reed wordt door magie of een andere kracht tegen zijn wil gecontroleerd", delta: 3 },
+        { id: "safe-rest", label: "Reed krijgt een moment van rust buiten gevaar", delta: -1 },
+        { id: "ally-thanks", label: "Een bondgenoot bedankt Reed oprecht", delta: -1 },
+        { id: "ally-reassures", label: "Een bondgenoot stelt Reed gerust en slaagt voor een passende check", delta: -3 },
+        { id: "enemy-surrenders", label: "Een vijand geeft zich over en vormt geen bedreiging meer", delta: -2 },
+        { id: "rescue-success", label: "Reed slaagt erin een bondgenoot te redden", delta: -2 },
+        { id: "repair-notes-tools", label: "Reed krijgt de tijd om zijn notities of werktuigen te herstellen", delta: -1 },
+        { id: "personal-goal", label: "Reed slaagt in een belangrijke persoonlijke doelstelling", delta: -2 },
+        { id: "smash-calmed", label: "Smash wordt gekalmeerd door een vertrouwde bondgenoot", delta: -3 }
       ],
       history: [],
       decayActive: false,
@@ -647,10 +682,14 @@
           activeForm,
           level,
           threshold: thresholdForLevel(level),
-          rage: nonNegativeInteger(saved.rage),
+          rage: Math.min(MAX_RAGE, nonNegativeInteger(saved.rage)),
           hpRatio,
           forms,
-          actions: Array.isArray(saved.actions) ? saved.actions.filter(action => action && typeof action.label === "string" && Number.isInteger(action.delta)) : structuredClone(defaultState.actions),
+          actions: Array.isArray(saved.actions)
+            ? saved.actions.length === 2 && saved.actions[0]?.id === "strain" && saved.actions[1]?.id === "calm"
+              ? structuredClone(defaultState.actions)
+              : saved.actions.filter(action => action && typeof action.label === "string" && Number.isInteger(action.delta))
+            : structuredClone(defaultState.actions),
           history: Array.isArray(saved.history) ? saved.history.slice(0, 40) : [],
           decayActive: saved.decayActive === true,
           nextDecayAt: Number.isFinite(Number(saved.nextDecayAt)) && saved.nextDecayAt !== null ? Number(saved.nextDecayAt) : null,
@@ -1008,8 +1047,12 @@
       state.history = state.history.slice(0, 40);
     }
 
-    function checkThreshold() {
-      if (state.activeForm === "reed" && !state.decayActive && state.rage >= state.threshold && !state.rollStatus && state.lastOutcome !== true) {
+    function checkThreshold(rageIncreased = false) {
+      if (state.rage >= MAX_RAGE && state.activeForm === "reed") {
+        state.rollStatus = null;
+        state.rollKind = null;
+        transformTo("smash");
+      } else if (rageIncreased && state.activeForm === "reed" && state.rage > 0 && state.rage >= state.threshold && !state.rollStatus && state.lastOutcome !== true) {
         state.rollStatus = "pending";
         state.rollKind = "initial";
       } else if (state.rage < state.threshold && state.rollKind === "initial") {
@@ -1019,10 +1062,11 @@
     }
 
     function applyAction(action) {
-      state.rage = Math.max(0, state.rage + action.delta);
+      const previousRage = state.rage;
+      state.rage = Math.min(MAX_RAGE, Math.max(0, state.rage + action.delta));
       addHistory(action.label, action.delta);
       state.lastOutcome = null;
-      checkThreshold();
+      checkThreshold(state.rage > previousRage);
       render();
     }
 
