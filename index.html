@@ -208,9 +208,28 @@
     .events-heading, .history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .events-heading { margin-bottom: 11px; }
     .section-title { margin: 0; font: 21px var(--serif); }
-    .events-list { display: grid; gap: 20px; }
-    .event-group { display: grid; gap: 8px; }
-    .event-group-title { margin: 0 0 2px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+    .events-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px 16px; }
+    .event-group { display: grid; gap: 8px; min-width: 0; }
+    .event-group-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin: 0;
+      padding: 2px 0;
+      border: 0;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    .event-group-toggle::before { content: "▾"; font-size: 12px; transition: transform .15s ease; }
+    .event-group.collapsed .event-group-toggle::before { transform: rotate(-90deg); }
+    .event-group.collapsed .event-group-list { display: none; }
     .event-group-list { display: grid; gap: 8px; }
 
     .event-row {
@@ -394,6 +413,7 @@
       .shell { width: calc(100% - 24px); }
       .score-panel { min-height: 170px; padding: 22px 18px; }
       .score-number { font-size: 66px; }
+      .events-list { grid-template-columns: 1fr; }
       .event-row { grid-template-columns: minmax(0, 1fr) auto 30px; gap: 6px; padding-left: 10px; }
       .add-event { grid-template-columns: minmax(0, 1fr) 64px 40px; gap: 6px; }
     }
@@ -579,7 +599,7 @@
     const STORAGE_KEY = "reed-smash-tracker";
     const ONLINE_CONFIG_KEY = "reed-smash-online";
     const SHARE_CODE_KEY = "reed-smash-share-code";
-    const MAX_RAGE = 20;
+    const MAX_RAGE = 30;
     const ONLINE_POLL_INTERVAL = 3000;
     const PUBLIC_TRACKER_TOKEN = "reed-smash-github-pages-public".padEnd(64, "0");
     const DEFAULT_ONLINE_CONFIG = {
@@ -717,6 +737,7 @@
 
     let state = loadState();
     let timerHandle = null;
+    const collapsedEventGroups = new Set();
     const elements = {
       formState: document.querySelector("#formState"),
       level: document.querySelector("#level"),
@@ -1083,10 +1104,16 @@
       const groupedIds = new Set(groups.flatMap(group => group.ids));
       const customActions = state.actions.filter(action => !groupedIds.has(action.id));
       if (customActions.length) groups.push({ label: "Eigen gebeurtenissen", actions: customActions });
-      elements.eventsList.innerHTML = groups.filter(group => group.actions.length).map(group => `
-        <section class="event-group">
-          <h3 class="event-group-title">${escapeHtml(group.label)}</h3>
-          <div class="event-group-list">${group.actions.map(action => `
+      elements.eventsList.innerHTML = groups.filter(group => group.actions.length).map(group => {
+        const collapsed = collapsedEventGroups.has(group.label);
+        return `
+        <section class="event-group${collapsed ? " collapsed" : ""}" data-event-group="${escapeHtml(group.label)}">
+          <h3 class="event-group-title">
+            <button class="event-group-toggle" type="button" data-toggle-group="${escapeHtml(group.label)}" aria-expanded="${!collapsed}" aria-controls="group-${encodeURIComponent(group.label)}">
+              ${escapeHtml(group.label)}
+            </button>
+          </h3>
+          <div class="event-group-list" id="group-${encodeURIComponent(group.label)}">${group.actions.map(action => `
             <div class="event-row">
               <button class="event-button" type="button" data-action="${escapeHtml(action.id)}" aria-label="${escapeHtml(action.label)}, ${action.delta > 0 ? "plus " : "min "}${Math.abs(action.delta)}">
                 <span class="event-name">${escapeHtml(action.label)}</span>
@@ -1096,7 +1123,8 @@
               <button class="remove-event" type="button" data-remove="${escapeHtml(action.id)}" aria-label="Verwijder ${escapeHtml(action.label)}" title="Gebeurtenis verwijderen">×</button>
             </div>`).join("")}
           </div>
-        </section>`).join("");
+        </section>`;
+      }).join("");
     }
 
     function renderHistory() {
@@ -1198,7 +1226,7 @@
 
     function setCountdown() {
       if (!state.decayActive || state.rollStatus === "pending") return;
-      if (!state.nextDecayAt) state.nextDecayAt = Date.now() + 30000;
+      if (!state.nextDecayAt) state.nextDecayAt = Date.now() + 60000;
       if (timerHandle) clearInterval(timerHandle);
       timerHandle = setInterval(() => {
         if (!state.decayActive || state.rollStatus === "pending") {
@@ -1264,6 +1292,14 @@
     }
 
     elements.eventsList.addEventListener("click", event => {
+      const groupToggle = event.target.closest("[data-toggle-group]");
+      if (groupToggle) {
+        const label = groupToggle.dataset.toggleGroup;
+        if (collapsedEventGroups.has(label)) collapsedEventGroups.delete(label);
+        else collapsedEventGroups.add(label);
+        renderActions();
+        return;
+      }
       const actionButton = event.target.closest("[data-action]");
       const removeButton = event.target.closest("[data-remove]");
       if (actionButton) {
